@@ -1,0 +1,34 @@
+enum Role {
+    ADMIN
+    USER
+    SUPER_ADMIN
+}
+
+enum PostStatus {
+    ACTIVE
+    CLOSED
+    DRAFT
+}
+
+enum ServiceType {
+    COUNTRY_ROADMAP
+    VISA_CONSULTATION
+    SKILL_PASS
+    ATS_RESUME_BUILDER
+    DOCUMENTS_REVIEW
+    INTERVIEW_PREP
+}
+
+enum OrderStatus {
+    PENDING
+    IN_PROGRESS
+    COMPLETED
+    CANCELLED
+}
+
+enum ApplicationStatus {
+    PENDING
+    REVIEWING
+    ACCEPTED
+    REJECTED
+}

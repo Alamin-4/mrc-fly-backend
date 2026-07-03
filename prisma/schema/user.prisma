@@ -1,0 +1,67 @@
+model User {
+    id            String    @id @default(cuid())
+    name          String
+    email         String    @unique
+    emailVerified DateTime?
+    passwordHash  String
+    phone         String?
+    role          Role      @default(USER)
+
+    // Security
+    failedAttempts Int       @default(0)
+    lockedUntil    DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Relations
+    sessions           Session[]
+    refreshTokens      RefreshToken[]
+    passwordResets     PasswordReset[]
+    emailVerifications EmailVerification[]
+    applications       Application[]
+    countryRoadmaps    CountryRoadmap[]
+    blogPosts          BlogPost[]
+}
+
+model Session {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    token     String   @unique
+    ipAddress String?
+    userAgent String?
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    token     String   @unique
+    familyId  String // Token rotation tracking
+    isRevoked Boolean  @default(false)
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    token     String   @unique
+    expiresAt DateTime
+    used      Boolean  @default(false)
+    createdAt DateTime @default(now())
+}
+
+model EmailVerification {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    token     String   @unique
+    expiresAt DateTime
+    used      Boolean  @default(false)
+    createdAt DateTime @default(now())
+}
