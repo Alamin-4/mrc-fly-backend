@@ -30,7 +30,7 @@ export class AuthService {
         const existingUser = await this.prisma.user.findUnique({
             where: { email: dto.email },
         });
-        if (existingUser) throw new ConflictException('Email already registered');
+        if (existingUser) throw new ConflictException('Email already registered. Please use a different email address.');
 
         // 2. Validate password strength
         const strength = this.passwordService.validateStrength(dto.password);
@@ -232,5 +232,30 @@ export class AuthService {
         });
 
         return { message: 'Password reset successful' };
+    }
+
+    async verifyEmail(token: string) {
+        const record = await this.prisma.emailVerification.findUnique({
+            where: { token },
+            include: { user: true },
+        });
+
+        if (!record || record.used || record.expiresAt < new Date()) {
+            throw new BadRequestException('Invalid or expired verification token');
+        }
+
+        // Update user verification status
+        await this.prisma.user.update({
+            where: { id: record.userId },
+            data: { emailVerified: new Date() },
+        });
+
+        // Mark token as used
+        await this.prisma.emailVerification.update({
+            where: { id: record.id },
+            data: { used: true },
+        });
+
+        return { message: 'Email verification successful' };
     }
 }
