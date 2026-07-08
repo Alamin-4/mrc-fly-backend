@@ -7,7 +7,7 @@ model User {
     phone         String?
     role          Role      @default(USER)
 
-    // Security
+    // Security — brute-force protection
     failedAttempts Int       @default(0)
     lockedUntil    DateTime?
 
@@ -22,46 +22,64 @@ model User {
     applications       Application[]
     countryRoadmaps    CountryRoadmap[]
     blogPosts          BlogPost[]
+
+    // email is already indexed via @unique
+    @@index([lockedUntil]) // Used in login lock-check and JWT strategy validate()
 }
 
 model Session {
     id        String   @id @default(cuid())
     userId    String
-    user      User     @relation(fields: [userId], references: [id])
+    // CASCADE: deleting a User automatically removes all their sessions
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     token     String   @unique
     ipAddress String?
     userAgent String?
     expiresAt DateTime
     createdAt DateTime @default(now())
+
+    @@index([userId])    // Used in deleteMany({ where: { userId } }) on logout/password-reset
+    @@index([expiresAt]) // Used by cleanup cron jobs to prune expired sessions
 }
 
 model RefreshToken {
     id        String   @id @default(cuid())
     userId    String
-    user      User     @relation(fields: [userId], references: [id])
+    // CASCADE: deleting a User automatically revokes all their refresh tokens
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // SECURITY: This column stores the SHA-256 HASH of the raw token, never the raw token itself.
+    // If the DB is breached, the hashes cannot be used directly.
     token     String   @unique
-    familyId  String // Token rotation tracking
+    familyId  String  // Groups a chain of rotated tokens — used for reuse detection
     isRevoked Boolean  @default(false)
     expiresAt DateTime
     createdAt DateTime @default(now())
+
+    @@index([familyId])  // Used in updateMany({ where: { familyId } }) for family-wide revocation
+    @@index([userId])    // Used in updateMany({ where: { userId } }) on password reset & logout
+    @@index([expiresAt]) // Used by cleanup cron jobs to prune expired tokens
 }
 
 model PasswordReset {
     id        String   @id @default(cuid())
     userId    String
-    user      User     @relation(fields: [userId], references: [id])
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     token     String   @unique
     expiresAt DateTime
     used      Boolean  @default(false)
     createdAt DateTime @default(now())
+
+    @@index([userId]) // Used in updateMany to invalidate old tokens when a new one is requested
 }
 
 model EmailVerification {
     id        String   @id @default(cuid())
     userId    String
-    user      User     @relation(fields: [userId], references: [id])
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     token     String   @unique
     expiresAt DateTime
     used      Boolean  @default(false)
     createdAt DateTime @default(now())
+
+    @@index([userId]) // Used in resend-verification queries
 }

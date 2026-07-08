@@ -1,0 +1,775 @@
+{
+  "info": {
+    "_postman_id": "mrc-fly-auth-collection-v1",
+    "name": "🛡️ MRC Fly — Auth API",
+    "description": "Complete authentication test suite for MRC Fly backend.\n\n**Setup:**\n1. Import this collection\n2. Import the `MRC_Fly_Auth.postman_environment.json` file alongside it\n3. Select the `MRC Fly Local` environment from the top-right dropdown\n4. Run requests in order (Register → Login → ...) or use Collection Runner for full suite\n\n**Auto-managed:**\n- `accessToken` is saved automatically after Login\n- `refreshToken` cookie is handled automatically by Postman\n- `userId`, `sessionToken`, `resetToken`, `verifyToken` are saved between requests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1️⃣  Register",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('Response has success message', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('Registration successful');",
+              "});",
+              "",
+              "pm.test('No tokens exposed in register response (security check)', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.not.have.property('accessToken');",
+              "    pm.expect(json).to.not.have.property('refreshToken');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Al Amin Islam\",\n  \"email\": \"alamin@mrcfly.com\",\n  \"password\": \"Test@1234\",\n  \"phone\": \"+8801700000000\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "register"]
+        },
+        "description": "Register a new user. Returns only a message — no tokens are issued until email is verified."
+      }
+    },
+    {
+      "name": "2️⃣  Register — Duplicate Email (expect 409)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 409 Conflict', function () {",
+              "    pm.response.to.have.status(409);",
+              "});",
+              "",
+              "pm.test('Error message mentions email already registered', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('already registered');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Al Amin Islam\",\n  \"email\": \"alamin@mrcfly.com\",\n  \"password\": \"Test@1234\",\n  \"phone\": \"+8801700000000\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "register"]
+        },
+        "description": "Attempt to register with the same email — must return 409 Conflict."
+      }
+    },
+    {
+      "name": "3️⃣  Register — Weak Password (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Weak User\",\n  \"email\": \"weak@mrcfly.com\",\n  \"password\": \"1234\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "register"]
+        },
+        "description": "Password too short — must return 400. Tests DTO @MinLength validation."
+      }
+    },
+    {
+      "name": "4️⃣  Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains accessToken', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property('accessToken');",
+              "    // Save for subsequent requests",
+              "    pm.environment.set('accessToken', json.accessToken);",
+              "});",
+              "",
+              "pm.test('Response contains user object', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.user).to.have.property('id');",
+              "    pm.expect(json.user).to.have.property('email');",
+              "    pm.expect(json.user).to.have.property('role');",
+              "    pm.environment.set('userId', json.user.id);",
+              "    pm.environment.set('sessionToken', json.sessionToken);",
+              "});",
+              "",
+              "pm.test('refreshToken is NOT in response body (security check)', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.not.have.property('refreshToken');",
+              "});",
+              "",
+              "pm.test('Set-Cookie header exists for refresh_token', function () {",
+              "    pm.expect(pm.response.headers.get('Set-Cookie')).to.include('refresh_token');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alamin@mrcfly.com\",\n  \"password\": \"Test@1234\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        },
+        "description": "Login with valid credentials. `accessToken` is saved to environment automatically.\n`refresh_token` is set as an HttpOnly cookie — Postman handles it automatically."
+      }
+    },
+    {
+      "name": "5️⃣  Login — Wrong Password (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Error message is generic (no user enumeration)', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.equal('Invalid credentials');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alamin@mrcfly.com\",\n  \"password\": \"WrongPassword!\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        },
+        "description": "Wrong password — must return 401 with a generic message (no email enumeration)."
+      }
+    },
+    {
+      "name": "6️⃣  Login — Unknown Email (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Same error as wrong password (timing attack prevention)', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.equal('Invalid credentials');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"nobody@mrcfly.com\",\n  \"password\": \"Test@1234\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        },
+        "description": "Unknown email — must return 401 with the SAME message as wrong password to prevent email enumeration."
+      }
+    },
+    {
+      "name": "7️⃣  Get Current User (/me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Returns user object without sensitive data', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property('id');",
+              "    pm.expect(json).to.have.property('email');",
+              "    pm.expect(json).to.have.property('role');",
+              "    pm.expect(json).to.not.have.property('passwordHash');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "me"]
+        },
+        "description": "Fetch authenticated user profile. Requires `Authorization: Bearer <accessToken>` header.\n`accessToken` is auto-populated from the Login step."
+      }
+    },
+    {
+      "name": "8️⃣  Get Current User — No Token (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "me"]
+        },
+        "description": "Request without Bearer token — must return 401."
+      }
+    },
+    {
+      "name": "9️⃣  Refresh Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Returns new accessToken', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property('accessToken');",
+              "    // Update environment with new access token",
+              "    pm.environment.set('accessToken', json.accessToken);",
+              "});",
+              "",
+              "pm.test('refreshToken is NOT in response body', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.not.have.property('refreshToken');",
+              "});",
+              "",
+              "pm.test('Set-Cookie rotates the refresh_token cookie', function () {",
+              "    pm.expect(pm.response.headers.get('Set-Cookie')).to.include('refresh_token');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "refresh"]
+        },
+        "description": "Rotate the refresh token. The `refresh_token` HttpOnly cookie is sent automatically by Postman.\nReturns a new `accessToken` and rotates the cookie."
+      }
+    },
+    {
+      "name": "🔟  Refresh Token — No Cookie (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Cookie", "value": "", "description": "Intentionally empty — no refresh_token cookie" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "refresh"]
+        },
+        "description": "Attempt refresh with no cookie — must return 401."
+      }
+    },
+    {
+      "name": "1️⃣1️⃣  Verify Email",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response confirms email verified', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('verified');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{verifyEmailToken}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/verify-email",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "verify-email"]
+        },
+        "description": "Verify email with the token from the verification email.\nSet `verifyEmailToken` in the environment manually (copy from email/DB) or replace inline."
+      }
+    },
+    {
+      "name": "1️⃣2️⃣  Verify Email — Already Used Token (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Error mentions invalid or expired token', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('Invalid or expired');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{verifyEmailToken}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/verify-email",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "verify-email"]
+        },
+        "description": "Reuse the same verification token — must return 400 (token already marked `used: true`)."
+      }
+    },
+    {
+      "name": "1️⃣3️⃣  Forgot Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response message is identical for known and unknown emails (no enumeration)', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('If that email is registered');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alamin@mrcfly.com\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/forgot-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "forgot-password"]
+        },
+        "description": "Trigger a password reset email. Always returns the same message regardless of whether the email exists."
+      }
+    },
+    {
+      "name": "1️⃣4️⃣  Forgot Password — Unknown Email (expect same message)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Same message as known email (email enumeration prevention)', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('If that email is registered');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"nobody_exists@mrcfly.com\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/forgot-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "forgot-password"]
+        },
+        "description": "Forgot password with an email that doesn't exist — must return identical message (no enumeration)."
+      }
+    },
+    {
+      "name": "1️⃣5️⃣  Reset Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response confirms password reset', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('Password reset successful');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{resetPasswordToken}}\",\n  \"newPassword\": \"NewSecure@5678\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/reset-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "reset-password"]
+        },
+        "description": "Reset password using the token from the email.\nSet `resetPasswordToken` in environment manually (copy from email/DB)."
+      }
+    },
+    {
+      "name": "1️⃣6️⃣  Reset Password — Expired/Invalid Token (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Error mentions invalid or expired token', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.message).to.include('Invalid or expired');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"thisisafaketokenthatshouldnotwork000000000000000000000000000000\",\n  \"newPassword\": \"NewSecure@5678\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/reset-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "reset-password"]
+        },
+        "description": "Fake/expired reset token — must return 400."
+      }
+    },
+    {
+      "name": "1️⃣7️⃣  Reset Password — Weak Password (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{resetPasswordToken}}\",\n  \"newPassword\": \"weak\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/reset-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "reset-password"]
+        },
+        "description": "Reset with a weak password — must return 400 from DTO @Matches regex validation."
+      }
+    },
+    {
+      "name": "1️⃣8️⃣  Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response confirms logout', function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.success).to.be.true;",
+              "    pm.expect(json.message).to.include('Logged out');",
+              "});",
+              "",
+              "pm.test('refresh_token cookie is cleared', function () {",
+              "    const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+              "    // Cookie should be cleared (Max-Age=0 or expired)",
+              "    pm.expect(setCookie).to.include('refresh_token');",
+              "});",
+              "",
+              "// Clear stored tokens from environment",
+              "pm.environment.unset('accessToken');",
+              "pm.environment.unset('sessionToken');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "logout"]
+        },
+        "description": "Logout the authenticated user. Uses `userId` from the JWT — NOT from the request body.\nAll sessions and refresh tokens for this user are invalidated."
+      }
+    },
+    {
+      "name": "1️⃣9️⃣  Logout — No Token (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "logout"]
+        },
+        "description": "Logout without a Bearer token — JwtAuthGuard must reject with 401."
+      }
+    },
+    {
+      "name": "2️⃣0️⃣  /me After Logout (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401 after logout', function () {",
+              "    pm.response.to.have.status(401);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}", "description": "Old token — should be invalid after logout" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "me"]
+        },
+        "description": "Attempt to use the old access token after logout. Note: since JWTs are stateless, this will still work until the 15-minute expiry unless you add a token blacklist (Redis). This test documents that behavior."
+      }
+    }
+  ]
+}

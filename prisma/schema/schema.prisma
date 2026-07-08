@@ -1,13 +1,14 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// NOTE: Models are split across multiple files in this directory.
+// See user.prisma, main.prisma, enum.prisma
 
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
 }
 
+// NOTE: In Prisma v7, the database URL is configured in prisma.config.ts — not here.
 datasource db {
   provider = "postgresql"
 }
